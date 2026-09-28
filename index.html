@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Timetable Assistant</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #242836;
+      --border: #2e3348;
+      --text: #e8eaed;
+      --muted: #9aa0b4;
+      --primary: #7c6aef;
+      --primary-dim: #5b4bc4;
+      --accent: #1abc9c;
+      --danger: #e74c3c;
+      --warning: #f39c12;
+      --success: #27ae60;
+      --blue: #3498db;
+      --purple: #9b59b6;
+      --radius: 12px;
+      --shadow: 0 4px 20px rgba(0,0,0,0.35);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .layout { display: flex; min-height: 100vh; }
+    /* Sidebar */
+    .sidebar {
+      width: 240px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 1.5rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, #7c6aef, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.25rem;
+    }
+    .logo-sub { font-size: 0.75rem; color: var(--muted); margin-bottom: 1.5rem; }
+    .nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      text-align: left;
+      padding: 0.7rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .nav-btn:hover, .nav-btn.active {
+      background: var(--surface2);
+      color: var(--text);
+    }
+    .nav-btn.active { border-left: 3px solid var(--primary); }
+    .sidebar-stats {
+      margin-top: auto;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .sidebar-stats strong { color: var(--text); }
+    /* Main */
+    .main { flex: 1; padding: 1.75rem 2rem; overflow-y: auto; max-width: 1100px; }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+    .subtitle { color: var(--muted); margin-bottom: 1.5rem; font-size: 0.95rem; }
+    /* Cards & metrics */
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .metric {
+      background: linear-gradient(135deg, #5b4bc4, #7c6aef);
+      border-radius: var(--radius);
+      padding: 1rem 1.2rem;
+      text-align: center;
+    }
+    .metric .val { font-size: 1.6rem; font-weight: 700; }
+    .metric .lbl { font-size: 0.8rem; opacity: 0.85; }
+    .grid-2 { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.5rem; }
+    @media (max-width: 800px) {
+      .layout { flex-direction: column; }
+      .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; padding: 1rem; }
+      .sidebar-stats { display: none; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .main { padding: 1rem; }
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.2rem;
+      margin-bottom: 0.75rem;
+      box-shadow: var(--shadow);
+    }
+    .card.priority-high { border-left: 4px solid var(--danger); }
+    .card.priority-medium { border-left: 4px solid var(--warning); }
+    .card.priority-low { border-left: 4px solid var(--success); }
+    .card.class { border-left: 4px solid var(--blue); }
+    .card.exam { border-left: 4px solid var(--purple); }
+    .card-title { font-weight: 600; }
+    .card-meta { font-size: 0.85rem; color: var(--muted); margin-top: 0.25rem; }
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #fff;
+      margin-right: 0.4rem;
+    }
+    .section-title { font-size: 1.1rem; font-weight: 600; margin: 1.25rem 0 0.75rem; }
+    /* Forms */
+    .form-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+    .form-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+    .form-group { flex: 1; min-width: 140px; }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.3rem; }
+    input, select, textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.55rem 0.75rem;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    textarea { resize: vertical; min-height: 60px; }
+    .btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.55rem 1.2rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: var(--primary-dim); }
+    .btn-sm {
+      padding: 0.35rem 0.6rem;
+      font-size: 0.8rem;
+      background: var(--surface2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-sm:hover { background: var(--border); color: var(--text); }
+    .btn-danger { background: var(--danger); }
+    .btn-danger:hover { background: #c0392b; }
+    .btn-success { background: var(--success); }
+    .row-actions { display: flex; gap: 0.4rem; align-items: flex-start; margin-top: 0.4rem; }
+    .empty { color: var(--muted); font-size: 0.95rem; padding: 1rem 0; }
+    .success-msg { color: var(--success); font-size: 0.9rem; margin-top: 0.5rem; }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .tab {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 0.45rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .day-tabs { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .day-tab {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 0.4rem 0.8rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .day-tab.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+    .filters { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .filters .form-group { max-width: 180px; }
+    details summary {
+      cursor: pointer;
+      font-weight: 600;
+      padding: 0.6rem 0;
+      color: var(--primary);
+      list-style: none;
+    }
+    details summary::-webkit-details-marker { display: none; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="logo">📅 AI Timetable</div>
+      <div class="logo-sub">Your smart student planner</div>
+      <button class="nav-btn active" data-page="dashboard">🏠 Dashboard</button>
+      <button class="nav-btn" data-page="classes">📚 Classes</button>
+      <button class="nav-btn" data-page="assignments">📝 Assignments</button>
+      <button class="nav-btn" data-page="exams">📋 Exams</button>
+      <button class="nav-btn" data-page="planner">🧠 Study Planner</button>
+      <button class="nav-btn" data-page="settings">⚙️ Settings</button>
+      <div class="sidebar-stats">
+        <div id="today-label"></div>
+        <div style="margin-top:0.5rem">Open assignments: <strong id="stat-asg">0</strong></div>
+        <div>Upcoming exams: <strong id="stat-exams">0</strong></div>
+      </div>
+    </aside>
+
+    <main class="main" id="content"></main>
+  </div>
+
+<script>
+const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const PRIORITIES = ["High","Medium","Low"];
+const STORAGE_KEY = "ai_timetable_data_v1";
+
+const DEFAULT = {
+  classes: [
+    { id:"c1", name:"Data Structures", day:"Monday", start:"09:00", end:"10:30", location:"Room 201", instructor:"Dr. Sharma" },
+    { id:"c2", name:"Linear Algebra", day:"Monday", start:"11:00", end:"12:30", location:"Hall B", instructor:"Prof. Patel" },
+    { id:"c3", name:"Operating Systems", day:"Tuesday", start:"10:00", end:"11:30", location:"Lab 3", instructor:"Dr. Khan" },
+    { id:"c4", name:"Web Development", day:"Wednesday", start:"14:00", end:"16:00", location:"CS Lab", instructor:"Ms. Gupta" },
+    { id:"c5", name:"Data Structures", day:"Thursday", start:"09:00", end:"10:30", location:"Room 201", instructor:"Dr. Sharma" },
+    { id:"c6", name:"Discrete Math", day:"Friday", start:"11:00", end:"12:30", location:"Room 105", instructor:"Dr. Mehta" }
+  ],
+  assignments: [
+    { id:"a1", title:"Binary Tree Implementation", due_date:"2026-09-30", priority:"High", course:"Data Structures", notes:"Implement BST insert, delete, traverse.", status:"Pending" },
+    { id:"a2", title:"Matrix Determinant Report", due_date:"2026-10-05", priority:"Medium", course:"Linear Algebra", notes:"5-page report with examples", status:"Pending" },
+    { id:"a3", title:"Process Scheduling Essay", due_date:"2026-10-02", priority:"High", course:"Operating Systems", notes:"Compare FCFS, SJF, Round Robin", status:"Pending" },
+    { id:"a4", title:"Personal Portfolio Page", due_date:"2026-10-10", priority:"Low", course:"Web Development", notes:"HTML/CSS/JS only", status:"Pending" }
+  ],
+  exams: [
+    { id:"e1", name:"Data Structures Midterm", date:"2026-10-08", time:"10:00", course:"Data Structures", location:"Exam Hall A", notes:"Trees, Graphs, Hashing, Sorting", priority:"High" },
+    { id:"e2", name:"Linear Algebra Quiz", date:"2026-10-03", time:"11:00", course:"Linear Algebra", location:"Hall B", notes:"Eigenvalues, Determinants", priority:"High" }
+  ],
+  settings: { study_hours_per_day: 4, preferred_study_start: "18:00", preferred_study_end: "22:00", break_minutes: 10 }
+};
+
+let data = loadData();
+let currentPage = "dashboard";
+let selectedDay = DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+
+function uid() { return Math.random().toString(36).slice(2, 10); }
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      return { ...DEFAULT, ...d, settings: { ...DEFAULT.settings, ...(d.settings||{}) } };
+    }
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT));
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  updateSidebarStats();
+}
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function daysUntil(dateStr) {
+  if (!dateStr) return 999;
+  const due = new Date(dateStr.slice(0,10) + "T12:00:00");
+  const now = new Date();
+  now.setHours(12,0,0,0);
+  return Math.round((due - now) / 86400000);
+}
+
+function getWeekdayName(d = new Date()) {
+  const i = d.getDay();
+  return DAYS[i === 0 ? 6 : i - 1];
+}
+
+function priorityScore(item, type = "assignment") {
+  let score = 0;
+  const p = item.priority || "Medium";
+  if (p === "High") score += 50;
+  else if (p === "Medium") score += 25;
+  else score += 10;
+  const days = daysUntil(item.due_date || item.date);
+  if (days < 0) score += 100;
+  else if (days === 0) score += 80;
+  else if (days === 1) score += 60;
+  else if (days <= 3) score += 40;
+  else if (days <= 7) score += 20;
+  else score += Math.max(0, 15 - days);
+  if (type === "exam") score += 30;
+  return score;
+}
+
+function parseTime(t) {
+  const [h, m] = (t || "09:00").split(":").map(Number);
+  return h * 60 + m;
+}
+
+function minutesBetween(start, end) {
+  return Math.max(0, parseTime(end) - parseTime(start));
+}
+
+function findFreeSlots(dayName) {
+  const occupied = data.classes
+    .filter(c => c.day === dayName)
+    .map(c => [parseTime(c.start), parseTime(c.end)])
+    .sort((a,b) => a[0] - b[0]);
+  const windows = [[8*60, 12*60], [13*60, 17*60], [18*60, 22*60]];
+  const free = [];
+  for (const [ws, we] of windows) {
+    let cur = ws;
+    for (const [os, oe] of occupied) {
+      if (oe <= cur || os >= we) continue;
+      if (os > cur) free.push([cur, Math.min(os, we)]);
+      cur = Math.max(cur, oe);
+    }
+    if (cur < we) free.push([cur, we]);
+  }
+  return free.filter(([s,e]) => e - s >= 30).map(([s,e]) => ({
+    start: `${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`,
+    end: `${String(Math.floor(e/60)).padStart(2,"0")}:${String(e%60).padStart(2,"0")}`,
+    mins: e - s
+  }));
+}
+
+function suggestStudyPlan() {
+  const pending = [];
+  data.assignments.filter(a => a.status !== "Completed").forEach(a => {
+    pending.push({ ...a, type: "assignment", score: priorityScore(a) });
+  });
+  data.exams.filter(e => daysUntil(e.date) >= 0).forEach(e => {
+    pending.push({ ...e, title: e.name, type: "exam", score: priorityScore(e, "exam") });
+  });
+  pending.sort((a,b) => b.score - a.score);
+  const today = new Date();
+  const suggestions = [];
+  pending.slice(0, 12).forEach((item, i) => {
+    const offset = Math.min(Math.floor(i / 2), 6);
+    const d = new Date(today);
+    d.setDate(d.getDate() + offset);
+    const hours = item.score > 70 ? 1.5 : item.score > 40 ? 1 : 0.75;
+    let reason = "";
+    const days = daysUntil(item.due_date || item.date);
+    if (days < 0) reason = "Overdue – focus immediately";
+    else if (days === 0) reason = "Due today";
+    else if (days === 1) reason = "Due tomorrow";
+    else if (item.type === "exam" && days <= 7) reason = `Exam in ${days} days – start revising`;
+    else if (days <= 3) reason = `Due in ${days} days`;
+    else reason = `Priority: ${item.priority || "Medium"}`;
+    suggestions.push({
+      date: d.toISOString().slice(0,10),
+      day: DAYS[d.getDay() === 0 ? 6 : d.getDay() - 1],
+      title: item.title || item.name,
+      type: item.type,
+      priority: item.priority || "High",
+      hours,
+      reason
+    });
+  });
+  return suggestions;
+}
+
+function updateSidebarStats() {
+  document.getElementById("today-label").textContent = "Today: " + new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  document.getElementById("stat-asg").textContent = data.assignments.filter(a => a.status !== "Completed").length;
+  document.getElementById("stat-exams").textContent = data.exams.filter(e => daysUntil(e.date) >= 0).length;
+}
+
+// ─── Navigation ───
+document.querySelectorAll(".nav-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    currentPage = btn.dataset.page;
+    render();
+  });
+});
+
+function render() {
+  updateSidebarStats();
+  const el = document.getElementById("content");
+  if (currentPage === "dashboard") el.innerHTML = renderDashboard();
+  else if (currentPage === "classes") el.innerHTML = renderClasses();
+  else if (currentPage === "assignments") el.innerHTML = renderAssignments();
+  else if (currentPage === "exams") el.innerHTML = renderExams();
+  else if (currentPage === "planner") el.innerHTML = renderPlanner();
+  else if (currentPage === "settings") el.innerHTML = renderSettings();
+  bindEvents();
+}
+
+// ─── Dashboard ───
+function renderDashboard() {
+  const dayName = getWeekdayName();
+  const classesToday = data.classes.filter(c => c.day === dayName).sort((a,b) => a.start.localeCompare(b.start));
+  const dueToday = [
+    ...data.assignments.filter(a => a.status !== "Completed" && daysUntil(a.due_date) === 0),
+    ...data.exams.filter(e => daysUntil(e.date) === 0)
+  ];
+  const upcoming = [
+    ...data.assignments.filter(a => a.status !== "Completed" && daysUntil(a.due_date) > 0 && daysUntil(a.due_date) <= 7)
+      .map(a => ({ ...a, kind: "Assignment", days_left: daysUntil(a.due_date) })),
+    ...data.exams.filter(e => daysUntil(e.date) > 0 && daysUntil(e.date) <= 14)
+      .map(e => ({ ...e, title: e.name, kind: "Exam", days_left: daysUntil(e.date) }))
+  ].sort((a,b) => a.days_left - b.days_left).slice(0, 8);
+  const free = findFreeSlots(dayName);
+  const freeMins = free.reduce((s, f) => s + f.mins, 0);
+  const suggestions = suggestStudyPlan().slice(0, 8);
+
+  return `
+    <h1>Dashboard</h1>
+    <p class="subtitle">Your day at a glance + AI insights</p>
+    <div class="metrics">
+      <div class="metric"><div class="val">${classesToday.length}</div><div class="lbl">Classes Today</div></div>
+      <div class="metric"><div class="val">${dueToday.length}</div><div class="lbl">Due Today</div></div>
+      <div class="metric"><div class="val">${upcoming.length}</div><div class="lbl">Upcoming</div></div>
+      <div class="metric"><div class="val">${Math.floor(freeMins/60)}h ${freeMins%60}m</div><div class="lbl">Free Study Time</div></div>
+    </div>
+    <div class="grid-2">
+      <div>
+        <div class="section-title">📅 Today's Classes</div>
+        ${classesToday.length ? classesToday.map(c => `
+          <div class="card class">
+            <div class="card-title">${esc(c.name)}</div>
+            <div class="card-meta">${c.start} – ${c.end}${c.location ? " · " + esc(c.location) : ""}${c.instructor ? "<br>" + esc(c.instructor) : ""}</div>
+          </div>`).join("") : `<p class="empty">No classes today. Great day to study!</p>`}
+        <div class="section-title">⚠️ Due Today</div>
+        ${dueToday.length ? dueToday.map(item => {
+          const title = item.title || item.name;
+          const prio = item.priority || "High";
+          return `<div class="card priority-${prio.toLowerCase()}"><div class="card-title">${esc(title)}</div>
+            <div class="card-meta">${prio} priority</div></div>`;
+        }).join("") : `<p class="empty" style="color:var(--success)">Nothing due today. Nice!</p>`}
+      </div>
+      <div>
+        <div class="section-title">🔮 Coming Up</div>
+        ${upcoming.length ? upcoming.map(u => {
+          const color = u.kind === "Exam" ? "var(--purple)" : (u.priority === "High" ? "var(--danger)" : u.priority === "Medium" ? "var(--warning)" : "var(--success)");
+          return `<div class="card"><span class="badge" style="background:${color}">${u.kind}</span>
+            <strong>${esc(u.title || u.name)}</strong>
+            <div class="card-meta">${u.days_left} day${u.days_left !== 1 ? "s" : ""} left</div></div>`;
+        }).join("") : `<p class="empty">No upcoming deadlines soon.</p>`}
+        <div class="section-title">🆓 Free Slots Today</div>
+        ${free.length ? free.map(f => `<div class="card-meta" style="margin-bottom:0.4rem">• <strong>${f.start} – ${f.end}</strong> (${f.mins} min)</div>`).join("") : `<p class="empty">No free slots ≥ 30 min found.</p>`}
+      </div>
+    </div>
+    <div class="section-title">🧠 AI Study Suggestions (Next 7 Days)</div>
+    ${suggestions.length ? suggestions.map(s => `
+      <div class="card priority-${(s.priority||"Medium").toLowerCase()}">
+        ${s.type === "exam" ? "📋" : "📝"} <strong>${esc(s.title)}</strong>
+        <span style="float:right;color:var(--muted)">${s.day} · ${s.hours}h</span>
+        <div class="card-meta">${esc(s.reason)}</div>
+      </div>`).join("") : `<p class="empty">Add assignments or exams to get suggestions.</p>`}
+  `;
+}
+
+// ─── Classes ───
+function renderClasses() {
+  const byDay = {};
+  DAYS.forEach(d => byDay[d] = []);
+  data.classes.forEach(c => { if (byDay[c.day]) byDay[c.day].push(c); });
+  DAYS.forEach(d => byDay[d].sort((a,b) => a.start.localeCompare(b.start)));
+
+  return `
+    <h1>Classes</h1>
+    <p class="subtitle">Manage your weekly class schedule</p>
+    <details>
+      <summary>➕ Add New Class</summary>
+      <div class="form-card" style="margin-top:0.5rem">
+        <div class="form-row">
+          <div class="form-group"><label>Class / Course Name *</label><input id="cls-name" placeholder="e.g. Data Structures" /></div>
+          <div class="form-group"><label>Day *</label><select id="cls-day">${DAYS.map(d => `<option>${d}</option>`).join("")}</select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Start</label><input type="time" id="cls-start" value="09:00" /></div>
+          <div class="form-group"><label>End</label><input type="time" id="cls-end" value="10:30" /></div>
+          <div class="form-group"><label>Location</label><input id="cls-loc" placeholder="Room 201" /></div>
+          <div class="form-group"><label>Instructor</label><input id="cls-inst" placeholder="Dr. Name" /></div>
+        </div>
+        <button class="btn" id="btn-add-class">Add Class</button>
+        <div id="cls-msg"></div>
+      </div>
+    </details>
+    <div class="section-title">Weekly Timetable</div>
+    <div class="day-tabs" id="day-tabs">
+      ${DAYS.map(d => `<button class="day-tab ${d === selectedDay ? "active" : ""}" data-day="${d}">${d.slice(0,3)}</button>`).join("")}
+    </div>
+    <div id="day-classes">
+      ${renderDayClasses(byDay[selectedDay] || [])}
+    </div>
+  `;
+}
+
+function renderDayClasses(list) {
+  if (!list.length) return `<p class="empty">No classes on this day.</p>`;
+  return list.map(c => `
+    <div class="card class">
+      <div class="card-title">${esc(c.name)}</div>
+      <div class="card-meta">${c.start} – ${c.end}${c.location ? " · 📍 " + esc(c.location) : ""}${c.instructor ? "<br>👤 " + esc(c.instructor) : ""}</div>
+      <div class="row-actions"><button class="btn btn-sm btn-danger" data-del-class="${c.id}">🗑️ Delete</button></div>
+    </div>`).join("");
+}
+
+// ─── Assignments ───
+function renderAssignments() {
+  const statusF = window._asgStatus || "All";
+  const prioF = window._asgPrio || "All";
+  let list = data.assignments.slice();
+  if (statusF !== "All") list = list.filter(a => a.status === statusF);
+  if (prioF !== "All") list = list.filter(a => a.priority === prioF);
+  list.sort((a,b) => priorityScore(b) - priorityScore(a));
+
+  return `
+    <h1>Assignments</h1>
+    <p class="subtitle">Track deadlines and priorities</p>
+    <details>
+      <summary>➕ Add Assignment</summary>
+      <div class="form-card" style="margin-top:0.5rem">
+        <div class="form-row">
+          <div class="form-group"><label>Title *</label><input id="asg-title" placeholder="Assignment title" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Due Date</label><input type="date" id="asg-due" value="${addDays(7)}" /></div>
+          <div class="form-group"><label>Priority</label><select id="asg-prio">${PRIORITIES.map(p => `<option ${p==="Medium"?"selected":""}>${p}</option>`).join("")}</select></div>
+          <div class="form-group"><label>Course</label><input id="asg-course" placeholder="Subject" /></div>
+        </div>
+        <div class="form-group"><label>Notes</label><textarea id="asg-notes"></textarea></div>
+        <button class="btn" id="btn-add-asg">Add Assignment</button>
+        <div id="asg-msg"></div>
+      </div>
+    </details>
+    <div class="filters">
+      <div class="form-group"><label>Status</label>
+        <select id="filter-status"><option>All</option><option>Pending</option><option>Completed</option></select>
+      </div>
+      <div class="form-group"><label>Priority</label>
+        <select id="filter-prio"><option>All</option>${PRIORITIES.map(p=>`<option>${p}</option>`).join("")}</select>
+      </div>
+    </div>
+    <div id="asg-list">
+      ${list.length ? list.map(a => {
+        const days = daysUntil(a.due_date);
+        const label = days < 0 ? "Overdue" : days === 0 ? "Today" : days + "d left";
+        return `<div class="card priority-${(a.priority||"Medium").toLowerCase()}">
+          <div class="card-title">${esc(a.title)}${a.course ? ` · <em style="font-weight:400;color:var(--muted)">${esc(a.course)}</em>` : ""}</div>
+          <div class="card-meta">Due: ${a.due_date} (${label}) · ${a.priority} priority${a.status==="Completed" ? " · ✅ Done" : ""}</div>
+          ${a.notes ? `<div class="card-meta">${esc(a.notes.slice(0,120))}</div>` : ""}
+          <div class="row-actions">
+            ${a.status !== "Completed" ? `<button class="btn btn-sm btn-success" data-done-asg="${a.id}">✅ Done</button>` : ""}
+            <button class="btn btn-sm btn-danger" data-del-asg="${a.id}">🗑️</button>
+          </div>
+        </div>`;
+      }).join("") : `<p class="empty">No assignments match the filters.</p>`}
+    </div>
+  `;
+}
+
+// ─── Exams ───
+function renderExams() {
+  const list = data.exams.slice().sort((a,b) => (a.date||"").localeCompare(b.date||""));
+  return `
+    <h1>Exams</h1>
+    <p class="subtitle">Exam schedule & countdown</p>
+    <details>
+      <summary>➕ Add Exam</summary>
+      <div class="form-card" style="margin-top:0.5rem">
+        <div class="form-row">
+          <div class="form-group"><label>Exam Name *</label><input id="ex-name" placeholder="Midterm / Final" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Date</label><input type="date" id="ex-date" value="${addDays(14)}" /></div>
+          <div class="form-group"><label>Time</label><input type="time" id="ex-time" value="09:00" /></div>
+          <div class="form-group"><label>Course</label><input id="ex-course" /></div>
+          <div class="form-group"><label>Location</label><input id="ex-loc" /></div>
+        </div>
+        <div class="form-group"><label>Topics / Notes</label><textarea id="ex-notes"></textarea></div>
+        <button class="btn" id="btn-add-exam">Add Exam</button>
+        <div id="ex-msg"></div>
+      </div>
+    </details>
+    <div class="section-title">Scheduled Exams</div>
+    ${list.length ? list.map(e => {
+      const days = daysUntil(e.date);
+      let badge, color;
+      if (days < 0) { badge = "Past"; color = "#95a5a6"; }
+      else if (days === 0) { badge = "TODAY"; color = "var(--danger)"; }
+      else if (days <= 3) { badge = days + "d"; color = "var(--danger)"; }
+      else if (days <= 7) { badge = days + "d"; color = "var(--warning)"; }
+      else { badge = days + "d"; color = "var(--blue)"; }
+      return `<div class="card exam">
+        <span class="badge" style="background:${color}">${badge}</span>
+        <strong>${esc(e.name)}</strong>${e.course ? " · " + esc(e.course) : ""}
+        <div class="card-meta">${e.date} at ${e.time || ""}${e.location ? " · 📍 " + esc(e.location) : ""}</div>
+        ${e.notes ? `<div class="card-meta">${esc(e.notes.slice(0,150))}</div>` : ""}
+        <div class="row-actions"><button class="btn btn-sm btn-danger" data-del-exam="${e.id}">🗑️ Delete</button></div>
+      </div>`;
+    }).join("") : `<p class="empty">No exams scheduled yet.</p>`}
+  `;
+}
+
+// ─── Planner ───
+function renderPlanner() {
+  const pending = [];
+  data.assignments.filter(a => a.status !== "Completed").forEach(a => {
+    pending.push({ ...a, type: "Assignment", score: priorityScore(a) });
+  });
+  data.exams.filter(e => daysUntil(e.date) >= 0).forEach(e => {
+    pending.push({ ...e, title: e.name, type: "Exam", score: priorityScore(e, "exam") });
+  });
+  pending.sort((a,b) => b.score - a.score);
+
+  const freeDay = window._freeDay || todayStr();
+  const freeDayName = getWeekdayName(new Date(freeDay + "T12:00:00"));
+  const free = findFreeSlots(freeDayName);
+  const freeTotal = free.reduce((s,f) => s + f.mins, 0);
+  const suggestions = suggestStudyPlan();
+  const byDay = {};
+  suggestions.forEach(s => { (byDay[s.date] = byDay[s.date] || []).push(s); });
+
+  return `
+    <h1>Study Planner</h1>
+    <p class="subtitle">AI-powered prioritization & free-slot finder</p>
+    <div class="tabs" id="planner-tabs">
+      <button class="tab active" data-ptab="queue">🎯 Priority Queue</button>
+      <button class="tab" data-ptab="slots">🆓 FreeSlots</button>
+      <button class="tab" data-ptab="plan">📆 Suggested Plan</button>
+    </div>
+    <div id="ptab-queue">
+      <p class="card-meta" style="margin-bottom:1rem">Tasks ranked by urgency (deadline + priority + type).</p>
+      ${pending.length ? pending.map((p,i) => {
+        const days = daysUntil(p.due_date || p.date);
+        return `<div class="card priority-${(p.priority||"High").toLowerCase()}">
+          <strong>#${i+1} ${esc(p.title || p.name)}</strong>
+          <span style="float:right;color:var(--muted)">Score: ${p.score}</span>
+          <div class="card-meta">${p.type} · ${days < 0 ? Math.abs(days)+"d overdue" : days+"d left"} · ${p.priority||"High"}</div>
+        </div>`;
+      }).join("") : `<p class="empty" style="color:var(--success)">All clear! No pending work.</p>`}
+    </div>
+    <div id="ptab-slots" class="hidden">
+      <div class="form-group" style="max-width:200px;margin-bottom:1rem">
+        <label>Select day</label>
+        <input type="date" id="free-date" value="${freeDay}" />
+      </div>
+      <p><strong>Free slots on ${freeDayName}, ${freeDay}</strong></p>
+      <p class="card-meta" style="margin:0.5rem 0">Total free time: <strong>${Math.floor(freeTotal/60)}h ${freeTotal%60}m</strong></p>
+      ${free.length ? free.map(f => `<div class="card-meta" style="margin-bottom:0.35rem">• <strong>${f.start} – ${f.end}</strong> (${f.mins} minutes)</div>`).join("") : `<p class="empty">No free slots ≥ 30 minutes.</p>`}
+      ${(() => {
+        const cls = data.classes.filter(c => c.day === freeDayName).sort((a,b)=>a.start.localeCompare(b.start));
+        return cls.length ? `<div class="section-title">Classes that day</div>` + cls.map(c => `<div class="card-meta">${c.start}–${c.end} · ${esc(c.name)}</div>`).join("") : "";
+      })()}
+    </div>
+    <div id="ptab-plan" class="hidden">
+      <p class="card-meta" style="margin-bottom:1rem">AI-generated study allocation for the next week.</p>
+      ${Object.keys(byDay).length ? Object.keys(byDay).sort().map(d => {
+        const items = byDay[d];
+        return `<div class="section-title">${items[0].day} (${d})</div>` +
+          items.map(s => `<div class="card priority-${(s.priority||"Medium").toLowerCase()}">
+            ${s.type==="exam"?"📋":"📝"} <strong>${esc(s.title)}</strong> — ${s.hours}h
+            <div class="card-meta">${esc(s.reason)}</div>
+          </div>`).join("");
+      }).join("") : `<p class="empty">Add assignments or exams to generate a plan.</p>`}
+    </div>
+  `;
+}
+
+// ─── Settings ───
+function renderSettings() {
+  const s = data.settings;
+  return `
+    <h1>Settings</h1>
+    <p class="subtitle">Preferences & data management</p>
+    <div class="form-card">
+      <div class="section-title" style="margin-top:0">Study Preferences</div>
+      <div class="form-row">
+        <div class="form-group"><label>Target study hours / day</label>
+          <input type="number" id="set-hours" min="1" max="12" value="${s.study_hours_per_day}" />
+        </div>
+        <div class="form-group"><label>Preferred start</label>
+          <input type="time" id="set-start" value="${s.preferred_study_start}" />
+        </div>
+        <div class="form-group"><label>Preferred end</label>
+          <input type="time" id="set-end" value="${s.preferred_study_end}" />
+        </div>
+        <div class="form-group"><label>Break (minutes)</label>
+          <input type="number" id="set-break" min="5" max="30" value="${s.break_minutes}" />
+        </div>
+      </div>
+      <button class="btn" id="btn-save-settings">Save Settings</button>
+      <div id="set-msg"></div>
+    </div>
+    <div class="form-card">
+      <div class="section-title" style="margin-top:0">Data</div>
+      <p class="card-meta" style="margin-bottom:1rem">Data is stored in your browser (localStorage). You can export or reset it.</p>
+      <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
+        <button class="btn" id="btn-export">⬇️ Export JSON</button>
+        <button class="btn btn-danger" id="btn-clear">🗑️ Clear All Data</button>
+      </div>
+    </div>
+  `;
+}
+
+// ─── Helpers ───
+function esc(s) {
+  if (!s) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function addDays(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0,10);
+}
+
+function bindEvents() {
+  // Add class
+  const btnCls = document.getElementById("btn-add-class");
+  if (btnCls) btnCls.onclick = () => {
+    const name = document.getElementById("cls-name").value.trim();
+    if (!name) { document.getElementById("cls-msg").innerHTML = `<span style="color:var(--danger)">Name required</span>`; return; }
+    data.classes.push({
+      id: uid(), name,
+      day: document.getElementById("cls-day").value,
+      start: document.getElementById("cls-start").value || "09:00",
+      end: document.getElementById("cls-end").value || "10:30",
+      location: document.getElementById("cls-loc").value.trim(),
+      instructor: document.getElementById("cls-inst").value.trim()
+    });
+    saveData();
+    render();
+  };
+
+  // Day tabs
+  document.querySelectorAll(".day-tab").forEach(t => {
+    t.onclick = () => { selectedDay = t.dataset.day; render(); };
+  });
+
+  // Delete class
+  document.querySelectorAll("[data-del-class]").forEach(b => {
+    b.onclick = () => {
+      data.classes = data.classes.filter(c => c.id !== b.dataset.delClass);
+      saveData(); render();
+    };
+  });
+
+  // Add assignment
+  const btnAsg = document.getElementById("btn-add-asg");
+  if (btnAsg) btnAsg.onclick = () => {
+    const title = document.getElementById("asg-title").value.trim();
+    if (!title) { document.getElementById("asg-msg").innerHTML = `<span style="color:var(--danger)">Title required</span>`; return; }
+    data.assignments.push({
+      id: uid(), title,
+      due_date: document.getElementById("asg-due").value || addDays(7),
+      priority: document.getElementById("asg-prio").value,
+      course: document.getElementById("asg-course").value.trim(),
+      notes: document.getElementById("asg-notes").value.trim(),
+      status: "Pending"
+    });
+    saveData(); render();
+  };
+
+  // Filters
+  const fs = document.getElementById("filter-status");
+  const fp = document.getElementById("filter-prio");
+  if (fs) { fs.value = window._asgStatus || "All"; fs.onchange = () => { window._asgStatus = fs.value; render(); }; }
+  if (fp) { fp.value = window._asgPrio || "All"; fp.onchange = () => { window._asgPrio = fp.value; render(); }; }
+
+  // Done / delete assignment
+  document.querySelectorAll("[data-done-asg]").forEach(b => {
+    b.onclick = () => {
+      const a = data.assignments.find(x => x.id === b.dataset.doneAsg);
+      if (a) a.status = "Completed";
+      saveData(); render();
+    };
+  });
+  document.querySelectorAll("[data-del-asg]").forEach(b => {
+    b.onclick = () => {
+      data.assignments = data.assignments.filter(x => x.id !== b.dataset.delAsg);
+      saveData(); render();
+    };
+  });
+
+  // Add exam
+  const btnEx = document.getElementById("btn-add-exam");
+  if (btnEx) btnEx.onclick = () => {
+    const name = document.getElementById("ex-name").value.trim();
+    if (!name) { document.getElementById("ex-msg").innerHTML = `<span style="color:var(--danger)">Name required</span>`; return; }
+    data.exams.push({
+      id: uid(), name,
+      date: document.getElementById("ex-date").value || addDays(14),
+      time: document.getElementById("ex-time").value || "09:00",
+      course: document.getElementById("ex-course").value.trim(),
+      location: document.getElementById("ex-loc").value.trim(),
+      notes: document.getElementById("ex-notes").value.trim(),
+      priority: "High"
+    });
+    saveData(); render();
+  };
+
+  document.querySelectorAll("[data-del-exam]").forEach(b => {
+    b.onclick = () => {
+      data.exams = data.exams.filter(x => x.id !== b.dataset.delExam);
+      saveData(); render();
+    };
+  });
+
+  // Planner tabs
+  document.querySelectorAll("[data-ptab]").forEach(t => {
+    t.onclick = () => {
+      document.querySelectorAll("[data-ptab]").forEach(x => x.classList.remove("active"));
+      t.classList.add("active");
+      ["queue","slots","plan"].forEach(id => {
+        const el = document.getElementById("ptab-" + id);
+        if (el) el.classList.toggle("hidden", t.dataset.ptab !== id);
+      });
+    };
+  });
+
+  const freeDate = document.getElementById("free-date");
+  if (freeDate) freeDate.onchange = () => { window._freeDay = freeDate.value; render(); };
+
+  // Settings
+  const btnSet = document.getElementById("btn-save-settings");
+  if (btnSet) btnSet.onclick = () => {
+    data.settings = {
+      study_hours_per_day: +document.getElementById("set-hours").value || 4,
+      preferred_study_start: document.getElementById("set-start").value || "18:00",
+      preferred_study_end: document.getElementById("set-end").value || "22:00",
+      break_minutes: +document.getElementById("set-break").value || 10
+    };
+    saveData();
+    document.getElementById("set-msg").innerHTML = `<span class="success-msg">Settings saved.</span>`;
+  };
+
+  const btnExport = document.getElementById("btn-export");
+  if (btnExport) btnExport.onclick = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `timetable_export_${todayStr()}.json`;
+    a.click();
+  };
+
+  const btnClear = document.getElementById("btn-clear");
+  if (btnClear) btnClear.onclick = () => {
+    if (confirm("Clear all classes, assignments, and exams?")) {
+      data = JSON.parse(JSON.stringify(DEFAULT));
+      data.classes = []; data.assignments = []; data.exams = [];
+      saveData(); render();
+    }
+  };
+}
+
+// Init
+render();
+</script>
+</body>
+</html>
